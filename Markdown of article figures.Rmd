@@ -1,0 +1,443 @@
+---
+title: "Modelling approach for crafting environmental regulations under deep uncertainty: whale watching in Ojo de Liebre, Mexico"
+author: "Emilio Rodríguez-Izquierdo"
+date: "September 2018"
+email: "13emil@gmail.com""
+output:
+  word_document: default
+---
+
+In this document you will find the scripts of the article figures.Bear in mind that you need to use the csv file with the Monte Carlo results (50,000 iterations)
+
+***Scenario laissez-faire**
+
+##Script of the results for whale abundance vs rate of habitat loss
+
+Load the libraries
+```{r librerias, eval=T}
+library(plyr)
+library(ggplot2)
+library(data.table)
+```
+
+**Load the database and create a subset**
+
+The full database is named "MC"" and the subset which only contains thevvalues of abundance and rate of habitat loss every 25 years, will be called "graph.dat".
+
+```{r hojadatos, eval=T}
+MC <- read.csv("C:/Users/emili/Desktop/Escenarios MonteCarlo SEPTIEMBRE2017/Nuevos Escenarios_Feb2018/ESC21_Hab_Kball.csv") ##note that you will have to use your own path 
+
+MC$r_ballenas<-as.numeric(MC$r_ballenas)
+
+
+graph.dat<- MC[,c(98,104,109,95,119,125,130,116,135)]  #these are the columns that correspond to the parameters we want to use
+
+```
+
+**Change from wide to long **
+
+```{r mlt, eval=T}
+graph.dat1 <- melt(setDT(graph.dat), measure.vars = patterns("PH", "P\\d"), 
+                   value.name = c("PdH", "Pob"),
+                   variable.name= "year")
+
+# rename factor levels of variable (you need to have the package "forcats" installed)
+
+graph.dat1[, year := forcats::lvls_revalue(year, c("25", "50", "75", "100"))][]
+```
+
+
+**Now we do the phase-diagram**
+We first define the colours (color-blind friendly) for each year through the object "cbPalette". 
+```{r graf1, eval=T}
+#color-blind-friendly
+cbPalette <- c("#999999", "#009E73", "#E69F00","#56B4E9")
+
+ggplot(graph.dat1,aes(x=PdH, y=Pob, colour=year)) +
+  geom_point(alpha =0.2) +
+  geom_hline(aes(yintercept=1000),colour="black",linetype="twodash",size=.8)+
+  
+  scale_size_area(max_size=3,
+                  breaks=c(0.025,0.032,max(graph.dat$r_ballenas))
+  ) +
+  
+  scale_y_continuous(expand=c(0,0)) +
+  scale_x_continuous (expand=c(0,0), breaks=c(20,40,60,80,100)) +
+  expand_limits(y=c(0,3000),x=c(0,105)) +
+  scale_colour_manual(values=cbPalette) +
+  
+  labs(x=expression("Rate of habitat loss (ha/year)"),
+       y=expression("Whale abundance (individulas)")) +
+  
+  theme_classic() + 
+  theme(axis.text=element_text(size=12),
+        axis.title=element_text(size=18,face="bold"),
+        axis.line.x = element_line(linetype="solid", colour="black"),
+        axis.line.y = element_line(linetype="solid", colour="black"),
+        panel.grid.major.x = element_blank(),
+        panel.grid.major.y = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.background= element_rect(fill = "gray99"),
+        panel.border=element_blank(),
+        legend.position="none"
+     ) 
+```
+
+##Script of the graph for the fitted curves every 25 years.
+
+First, we load the package ggpmisc (Aphalo, 2016) that we used (through the "stat_poly_eq") to obtain the equations and the coefficients of determination. You need to save the image with at least 1650x740 dimension to avoid having the equations on top of the curves.
+
+```{r ajuste, eval=T}
+library(ggpmisc)
+
+my.formula <- y ~ x
+
+p25en25<-ggplot(graph.dat1,aes(x=PdH, y=Pob, colour=year)) +
+  
+  geom_smooth(formula = my.formula, size=1.6, se=FALSE) +
+  
+  stat_poly_eq(formula=my.formula,
+               aes(label = paste(..eq.label.., ..rr.label.., sep = "*plain(\";\")~~")),
+               parse = T)  +
+  
+  
+  labs(x=expression("Rate of habitat loss (ha/year)"),
+       y=expression("Whale abundance (individuals)")) +
+  scale_colour_manual(values=cbPalette) +
+  
+  theme_classic() +
+  
+  theme(axis.text=element_text(size=12),
+        axis.title=element_text(size=18,face="bold"),
+        legend.position="none" ) +
+  
+  scale_y_continuous(expand=c(0,0)) +
+  scale_x_continuous (expand=c(0,1), breaks=c(20,40,60,80,100)) 
+
+p25en25
+```
+
+
+##Script of the figure 6 that relates the whale abundance and the number of boats.
+
+
+**We do the graphs with the mean values every 5 years**
+
+```{r graf_juntas, eval=T}
+library(ggpubr)
+
+pobl<-subset(MC[,c(93,103,94,96,97,98,99,100,101,
+                   102,104,105,106,107,108,109,
+                   110,111,112,113,95)])
+
+promed_pobl<-apply(pobl,2,mean)
+tiempo<-seq(0,100,by=5)
+
+graf_promed_pobl<-data.frame(tiempo,promed_pobl)
+
+graf_promed_pobl$tiempo<-as.factor(graf_promed_pobl$tiempo)
+
+population<- ggplot(graf_promed_pobl, aes(x=tiempo, y=promed_pobl)) +
+  
+  geom_point(colour="black", size=3)  +
+  
+  geom_vline(aes(xintercept=as.numeric(tiempo[c(6)])),
+             linetype=4, colour="black") +
+  
+  scale_y_continuous(expand=c(0,0),breaks=c(500,1000,1500)) +
+  
+  
+  expand_limits(y=c(0,1700)) +
+  
+  
+  labs(y=expression("Average number of whales")) +
+  
+  theme_classic() + 
+  
+  theme(axis.text=element_text(size=14),
+        axis.title=element_text(size=20,face="bold"),
+        axis.ticks.margin = unit(c(0,0,0,0), "lines"),
+        axis.text.x=element_blank(),
+        axis.title.x=element_blank(),
+        panel.grid.major.x = element_blank(),
+        panel.grid.major.y = element_line(linetype="dashed",colour="gray"),
+        panel.grid.minor = element_blank(),
+        panel.background= element_rect(fill = "gray99"),
+        panel.border=element_blank(),
+        legend.position="none"
+  ) 
+
+
+
+####################################################
+#### Graph of the mean values of boats        ####
+
+EMB <- read.csv("C:/Users/emili/Desktop/Escenarios MonteCarlo SEPTIEMBRE2017/Nuevos Escenarios_Feb2018/ESC21_Hab_Kball.csv")
+
+
+EMB$r_ballenas<-as.numeric(MC$r_ballenas)
+
+
+Emb_todo<- subset(MC[,c(23, 33, 24, 26, 27, 28, 29, 30, 31, 32,  34, 35, 36, 37, 38, 39, 40,
+                        41, 42, 43, 25)])
+
+tiempo<-seq(0,100,by=5)
+
+promed_Emb<-apply(Emb_todo,2,mean)
+
+graf_promed_emb<-data.frame(tiempo,promed_Emb)
+
+graf_promed_emb$tiempo<-as.factor(graf_promed_emb$tiempo)
+
+
+boats<- ggplot(graf_promed_emb, aes(x=tiempo, y=promed_Emb)) +
+  
+  geom_point(colour="black", size=3)  +
+  geom_vline(aes(xintercept=as.numeric(tiempo[c(6)])),
+             linetype=4, colour="black") +
+  
+  scale_y_continuous(breaks=c(20,40,60,80)) +
+  scale_x_discrete(breaks=c(25,50,75,100)) +
+  
+  expand_limits(y=c(0,85)) +
+  
+  labs(x=expression("year"),
+       y=expression("Average number of boats")) +
+  
+  theme_classic() + 
+  
+  theme(axis.text=element_text(size=14),
+        axis.title=element_text(size=20,face="bold"),
+        axis.ticks.margin = unit(c(0,0,0,0), "lines"),
+        panel.grid.major.x = element_blank(),
+        panel.grid.major.y = element_line(linetype="dashed",colour="gray"),
+        panel.grid.minor = element_blank(),
+        panel.background= element_rect(fill = "gray99"),
+        panel.border=element_blank(),
+        legend.position="none"
+  ) 
+
+
+figure<- ggarrange (population, boats, 
+                    ncol=1, nrow=2, align = "v")
+
+figure
+```
+
+
+
+***Scenario government intervention**
+
+
+
+Load the libraries
+```{r librerias, eval=T}
+library(plyr)
+library(ggplot2)
+library(data.table)
+```
+
+**Load the database and create a subset**
+
+The full database is named "MC"" and the subset which only contains thevvalues of abundance and rate of habitat loss every 25 years, will be called "graph.dat".
+
+```{r hojadatos, eval=T}
+MC <- read.csv("C:/Users/emili/Desktop/Ecological Modelling/Versión NUEVA_Junio2018/Resultados_30emb.csv") ##note that you will have to use your own path 
+
+MC$r_ballenas<-as.numeric(MC$r_ballenas)
+
+
+graph.dat<- MC[,c(98,104,109,95,119,125,130,116,135)]  #these are the columns that correspond to the parameters we want to use
+
+```
+
+**Change from wide to long **
+
+```{r mlt, eval=T}
+graph.dat1 <- melt(setDT(graph.dat), measure.vars = patterns("PH", "P\\d"), 
+                   value.name = c("PdH", "Pob"),
+                   variable.name= "year")
+
+# rename factor levels of variable (you need to have the package "forcats" installed)
+
+graph.dat1[, year := forcats::lvls_revalue(year, c("25", "50", "75", "100"))][]
+```
+
+
+**Now we do the phase-diagram**
+We first define the colours (color-blind friendly) for each year through the object "cbPalette". 
+```{r graf1, eval=T}
+#color-blind-friendly
+cbPalette <- c("#999999", "#009E73", "#E69F00","#56B4E9")
+
+ggplot(graph.dat1,aes(x=PdH, y=Pob, colour=year)) +
+  geom_point(alpha =0.2) +
+  geom_hline(aes(yintercept=1000),colour="black",linetype="twodash",size=.8)+
+  
+  scale_size_area(max_size=3,
+                  breaks=c(0.025,0.032,max(graph.dat$r_ballenas))
+  ) +
+  
+  scale_y_continuous(expand=c(0,0)) +
+  scale_x_continuous (expand=c(0,0), breaks=c(10,20,30)) +
+  expand_limits(y=c(0,3000),x=c(0,35)) +
+  scale_colour_manual(values=cbPalette) +
+  
+  labs(x=expression("Rate of habitat loss (ha/year)"),
+       y=expression("Whale abundance (individulas)")) +
+  
+  theme_classic() + 
+  theme(axis.text=element_text(size=12),
+        axis.title=element_text(size=18,face="bold"),
+        axis.line.x = element_line(linetype="solid", colour="black"),
+        axis.line.y = element_line(linetype="solid", colour="black"),
+        panel.grid.major.x = element_blank(),
+        panel.grid.major.y = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.background= element_rect(fill = "gray99"),
+        panel.border=element_blank(),
+        legend.position="none"
+     ) 
+```
+
+##Script of the graph for the fitted curves every 25 years.
+
+First, we load the package ggpmisc (Aphalo, 2016) that we used (through the "stat_poly_eq") to obtain the equations and the coefficients of determination. You need to save the image with at least 1650x740 dimension to avoid having the equations on top of the curves.
+
+```{r ajuste, eval=T}
+library(ggpmisc)
+
+my.formula <- y ~ x
+
+p25en25<-ggplot(graph.dat1,aes(x=PdH, y=Pob, colour=year)) +
+  
+  geom_smooth(formula = my.formula, size=1.6, se=FALSE) +
+  
+  stat_poly_eq(formula=my.formula,
+               aes(label = paste(..eq.label.., ..rr.label.., sep = "*plain(\";\")~~")),
+               parse = T)  +
+  
+  
+  labs(x=expression("Rate of habitat loss (ha/year)"),
+       y=expression("Whale abundance (individuals)")) +
+  scale_colour_manual(values=cbPalette) +
+  
+  theme_classic() +
+  
+  theme(axis.text=element_text(size=12),
+        axis.title=element_text(size=18,face="bold"),
+        legend.position="none" ) +
+  
+  scale_y_continuous(expand=c(0,0)) +
+  scale_x_continuous (expand=c(0,1), breaks=c(10,20,30)) 
+
+p25en25
+```
+
+
+##Script of the figure 6 that relates the whale abundance and the number of boats.
+
+
+**We do the graphs with the mean values every 5 years**
+
+```{r graf_juntas, eval=T}
+library(ggpubr)
+
+pobl<-subset(MC[,c(93,103,94,96,97,98,99,100,101,
+                   102,104,105,106,107,108,109,
+                   110,111,112,113,95)])
+
+promed_pobl<-apply(pobl,2,mean)
+tiempo<-seq(0,100,by=5)
+
+graf_promed_pobl<-data.frame(tiempo,promed_pobl)
+
+graf_promed_pobl$tiempo<-as.factor(graf_promed_pobl$tiempo)
+
+population<- ggplot(graf_promed_pobl, aes(x=tiempo, y=promed_pobl)) +
+  
+  geom_point(colour="black", size=3)  +
+  
+  geom_vline(aes(xintercept=as.numeric(tiempo[c(6)])),
+             linetype=4, colour="black") +
+  
+  scale_y_continuous(expand=c(0,0),breaks=c(500,1000,1500)) +
+  
+  
+  expand_limits(y=c(0,1800)) +
+  
+  
+  labs(y=expression("Average number of whales")) +
+  
+  theme_classic() + 
+  
+  theme(axis.text=element_text(size=14),
+        axis.title=element_text(size=20,face="bold"),
+        axis.ticks.margin = unit(c(0,0,0,0), "lines"),
+        axis.text.x=element_blank(),
+        axis.title.x=element_blank(),
+        panel.grid.major.x = element_blank(),
+        panel.grid.major.y = element_line(linetype="dashed",colour="gray"),
+        panel.grid.minor = element_blank(),
+        panel.background= element_rect(fill = "gray99"),
+        panel.border=element_blank(),
+        legend.position="none"
+  ) 
+
+
+
+####################################################
+#### Graph of the mean values of boats        ####
+
+EMB <- read.csv("C:/Users/emili/Desktop/Ecological Modelling/Versión NUEVA_Junio2018/Resultados_30emb.csv")
+
+
+EMB$r_ballenas<-as.numeric(MC$r_ballenas)
+
+
+Emb_todo<- subset(MC[,c(23, 33, 24, 26, 27, 28, 29, 30, 31, 32,  34, 35, 36, 37, 38, 39, 40,
+                        41, 42, 43, 25)])
+
+tiempo<-seq(0,100,by=5)
+
+promed_Emb<-apply(Emb_todo,2,mean)
+
+graf_promed_emb<-data.frame(tiempo,promed_Emb)
+
+graf_promed_emb$tiempo<-as.factor(graf_promed_emb$tiempo)
+
+
+boats<- ggplot(graf_promed_emb, aes(x=tiempo, y=promed_Emb)) +
+  
+  geom_point(colour="black", size=3)  +
+  geom_vline(aes(xintercept=as.numeric(tiempo[c(6)])),
+             linetype=4, colour="black") +
+  
+  scale_y_continuous(breaks=c(15,30)) +
+  scale_x_discrete(breaks=c(25,50,75,100)) +
+  
+  expand_limits(y=c(0,40)) +
+  
+  labs(x=expression("year"),
+       y=expression("Average number of boats")) +
+  
+  theme_classic() + 
+  
+  theme(axis.text=element_text(size=14),
+        axis.title=element_text(size=20,face="bold"),
+        axis.ticks.margin = unit(c(0,0,0,0), "lines"),
+        panel.grid.major.x = element_blank(),
+        panel.grid.major.y = element_line(linetype="dashed",colour="gray"),
+        panel.grid.minor = element_blank(),
+        panel.background= element_rect(fill = "gray99"),
+        panel.border=element_blank(),
+        legend.position="none"
+  ) 
+
+
+figure<- ggarrange (population, boats, 
+                    ncol=1, nrow=2, align = "v")
+
+figure
+```
+
